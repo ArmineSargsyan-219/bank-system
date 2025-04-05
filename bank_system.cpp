@@ -131,3 +131,65 @@ class BankCard{
     }
 };
 
+class DebitCard : public BankCard {
+    private:
+        double accountBalance;
+        std::string accountNumber;
+        bool overdraftProtection;
+    
+    public:
+        DebitCard(const std::string& name, double initialBalance, bool overdraft = false)
+            : BankCard(name, initialBalance), accountBalance(initialBalance), 
+              overdraftProtection(overdraft) {
+            std::stringstream ss;
+            ss << "ACCT" << std::setfill('0') << std::setw(8) << (rand() % 100000000);
+            accountNumber = ss.str();
+        }
+        
+        double getBalance() const { return accountBalance; }
+        
+        void deposit(double amount) {
+            if (amount > 0) {
+                accountBalance += amount;
+                std::cout << "Deposited $" << std::fixed << std::setprecision(2) << amount 
+                          << ". New balance: $" << accountBalance << std::endl;
+            } else {
+                std::cout << "Invalid deposit amount." << std::endl;
+            }
+        }
+        
+        bool withdraw(double amount) {
+            if (amount <= 0) {
+                std::cout << "Invalid withdrawal amount." << std::endl;
+                return false;
+            }
+            
+            if (amount > accountBalance && !overdraftProtection) {
+                std::cout << "Insufficient funds. Withdrawal declined." << std::endl;
+                return false;
+            }
+            
+            accountBalance -= amount;
+            std::cout << "Withdrew $" << std::fixed << std::setprecision(2) << amount 
+                      << ". New balance: $" << accountBalance << std::endl;
+                      
+            if (accountBalance < 0) {
+                std::cout << "Warning: Account is overdrawn." << std::endl;
+            }
+            
+            return true;
+        }
+
+        std::string getCardType() const override {
+            return "Debit Card";
+        }
+        
+        void displayCardInfo() const {
+            BankCard::displayCardInfo();
+            std::cout << "Account Number: " << accountNumber << std::endl;
+            std::cout << "Current Balance: $" << std::fixed << std::setprecision(2) << accountBalance << std::endl;
+            std::cout << "Overdraft Protection: " << (overdraftProtection ? "Enabled" : "Disabled") << std::endl;
+            std::cout << "------------------------------" << std::endl;
+        }
+    };
+

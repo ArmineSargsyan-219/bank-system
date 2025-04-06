@@ -193,3 +193,79 @@ class DebitCard : public BankCard {
         }
     };
 
+    class CreditCard : public BankCard {
+        private:
+            double currentBalance;
+            double interestRate;
+            std::string billingCycle;
+            double minimumPayment;
+        
+        public:
+            CreditCard(const std::string& name, double limit, double rate)
+                : BankCard(name, limit), currentBalance(0), interestRate(rate) {
+                billingCycle = "Monthly";
+                minimumPayment = 25.0;
+            }
+            
+            double getBalance() const { return currentBalance; }
+            double getAvailableCredit() const { return cardLimit - currentBalance; }
+            
+            void makePayment(double amount) {
+                if (amount <= 0) {
+                    std::cout << "Invalid payment amount." << std::endl;
+                    return;
+                }
+                
+                currentBalance -= amount;
+                if (currentBalance < 0) currentBalance = 0;
+                
+                std::cout << "Payment of $" << std::fixed << std::setprecision(2) << amount 
+                          << " applied. New balance: $" << currentBalance << std::endl;
+            }
+            
+            void applyInterest() {
+                double interest = currentBalance * (interestRate / 12); // Monthly interest
+                currentBalance += interest;
+                std::cout << "Interest of $" << std::fixed << std::setprecision(2) << interest 
+                          << " applied. New balance: $" << currentBalance << std::endl;
+            }
+            
+            bool processTransaction(Transaction& transaction) override {
+                double amount = transaction.getAmount();
+                
+                if (!BankCard::processTransaction(transaction)) {
+                    return false;
+                }
+                
+                if (currentBalance + amount > cardLimit) {
+                    std::cout << "Transaction exceeds credit limit. Transaction declined." << std::endl;
+                    transaction.decline();
+                    return false;
+                }
+                
+                currentBalance += amount;
+                transaction.approve();
+                std::cout << "Transaction approved. New balance: $" 
+                          << std::fixed << std::setprecision(2) << currentBalance 
+                          << ". Available credit: $" << (cardLimit - currentBalance) << std::endl;
+                
+                return true;
+            }
+            
+            std::string getCardType() const override {
+                return "Credit Card";
+            }
+            
+            void displayCardInfo() const {
+                BankCard::displayCardInfo();
+                std::cout << "Credit Limit: $" << std::fixed << std::setprecision(2) << cardLimit << std::endl;
+                std::cout << "Current Balance: $" << currentBalance << std::endl;
+                std::cout << "Available Credit: $" << (cardLimit - currentBalance) << std::endl;
+                std::cout << "Interest Rate: " << (interestRate * 100) << "%" << std::endl;
+                std::cout << "Minimum Payment: $" << minimumPayment << std::endl;
+                std::cout << "------------------------------" << std::endl;
+            }
+        };
+        
+    
+

@@ -28,7 +28,8 @@ class Transaction{
 
     void approve() {approved = true;}
     void decline() {approved = false;}
-    bool isApproved() const {return amount;}
+    bool isApproved() const {return approved;}
+    double getAmount() const { return amount; }
     std::string getDescription() const {return description;} 
     std::string getMerchantName() const { return merchantName;}
     std::string getTransactionId() const {return transactionId;}
@@ -269,3 +270,225 @@ class DebitCard : public BankCard {
         
     
 
+        class BankCardSystem {
+            private:
+                std::vector<BankCard*> cards;
+            public:
+                ~BankCardSystem() {
+                    for (auto card : cards) {
+                        delete card;
+                    }
+                    cards.clear();
+                }
+            
+                void addCard(BankCard* card) {
+                    cards.push_back(card);
+                    std::cout << "Card successfully added to the system." << std::endl;
+                }
+            
+                BankCard* findCard(const std::string& cardNumber) {
+                    for (auto card : cards) {
+                        if (card->getCardNumber() == cardNumber) {
+                            return card;
+                        }
+                    }
+                    return nullptr;
+                }
+            
+                void displayAllCards() const {
+                    if (cards.empty()) {
+                        std::cout << "No cards in the system." << std::endl;
+                        return;
+                    }
+            
+                    std::cout << "All Cards in the System:" << std::endl;
+                    std::cout << "======================" << std::endl;
+            
+                    for (const auto card : cards) {
+                        card->displayCardInfo();
+                    }
+                }
+            };
+            
+            // Simple menu-based interface to demonstrate the system
+            void displayMenu() {
+                std::cout << "\nBank Card System Menu:" << std::endl;
+                std::cout << "1. Create a new debit card" << std::endl;
+                std::cout << "2. Create a new credit card" << std::endl;
+                std::cout << "3. Display all cards" << std::endl;
+                std::cout << "4. Process a transaction" << std::endl;
+                std::cout << "5. Make a payment to credit card" << std::endl;
+                std::cout << "6. Make a deposit to debit card" << std::endl;
+                std::cout << "7. View transaction history" << std::endl;
+                std::cout << "8. Activate/Deactivate a card" << std::endl;
+                std::cout << "9. Exit" << std::endl;
+                std::cout << "Enter your choice: ";
+            }
+            
+            int main() {
+                // Seed random number generator
+                std::srand(static_cast<unsigned int>(std::time(nullptr)));
+            
+                BankCardSystem cardSystem;
+                int choice;
+                std::string name, cardNumber;
+                double amount, limit, rate, initialBalance;
+                bool overdraft;
+            
+                do {
+                    displayMenu();
+                    std::cin >> choice;
+            
+                    // Handle different menu options
+                    if (choice == 1) {
+                        std::cin.ignore(); // Clear the newline from the buffer
+                        std::cout << "Enter cardholder name: ";
+                        std::getline(std::cin, name);
+            
+                        std::cout << "Enter initial balance: $";
+                        std::cin >> initialBalance;
+            
+                        std::cout << "Enable overdraft protection? (1 for Yes, 0 for No): ";
+                        std::cin >> overdraft;
+            
+                        DebitCard* debitCard = new DebitCard(name, initialBalance, overdraft);
+                        cardSystem.addCard(debitCard);
+                        debitCard->displayCardInfo();
+                    }
+                    else if (choice == 2) {
+                        std::cin.ignore(); // Clear the newline from the buffer
+                        std::cout << "Enter cardholder name: ";
+                        std::getline(std::cin, name);
+            
+                        std::cout << "Enter credit limit: $";
+                        std::cin >> limit;
+            
+                        std::cout << "Enter annual interest rate (as decimal, e.g., 0.1895 for 18.95%): ";
+                        std::cin >> rate;
+            
+                        CreditCard* creditCard = new CreditCard(name, limit, rate);
+                        cardSystem.addCard(creditCard);
+                        creditCard->displayCardInfo();
+                    }
+                    else if (choice == 3) {
+                        cardSystem.displayAllCards();
+                    }
+                    else if (choice == 4) {
+                        std::cin.ignore(); // Clear the newline from the buffer
+                        std::cout << "Enter card number: ";
+                        std::getline(std::cin, cardNumber);
+            
+                        BankCard* card = cardSystem.findCard(cardNumber);
+                        if (!card) {
+                            std::cout << "Card not found." << std::endl;
+                        }
+                        else {
+                            std::cout << "Enter transaction amount: $";
+                            std::cin >> amount;
+            
+                            std::cin.ignore(); // Clear the newline
+                            std::cout << "Enter merchant name: ";
+                            std::string merchant;
+                            std::getline(std::cin, merchant);
+            
+                            std::cout << "Enter transaction description: ";
+                            std::string description;
+                            std::getline(std::cin, description);
+            
+                            Transaction transaction(amount, description, merchant);
+                            card->processTransaction(transaction);
+                        }
+                    }
+                    else if (choice == 5) {
+                        std::cin.ignore(); // Clear the newline from the buffer
+                        std::cout << "Enter credit card number: ";
+                        std::getline(std::cin, cardNumber);
+            
+                        BankCard* card = cardSystem.findCard(cardNumber);
+                        if (!card) {
+                            std::cout << "Card not found." << std::endl;
+                        }
+                        else {
+                            CreditCard* creditCard = dynamic_cast<CreditCard*>(card);
+                            if (!creditCard) {
+                                std::cout << "This is not a credit card." << std::endl;
+                            }
+                            else {
+                                std::cout << "Enter payment amount: $";
+                                std::cin >> amount;
+            
+                                creditCard->makePayment(amount);
+                            }
+                        }
+                    }
+                    else if (choice == 6) {
+                        std::cin.ignore(); // Clear the newline from the buffer
+                        std::cout << "Enter debit card number: ";
+                        std::getline(std::cin, cardNumber);
+            
+                        BankCard* card = cardSystem.findCard(cardNumber);
+                        if (!card) {
+                            std::cout << "Card not found." << std::endl;
+                        }
+                        else {
+                            DebitCard* debitCard = dynamic_cast<DebitCard*>(card);
+                            if (!debitCard) {
+                                std::cout << "This is not a debit card." << std::endl;
+                            }
+                            else {
+                                std::cout << "Enter deposit amount: $";
+                                std::cin >> amount;
+            
+                                debitCard->deposit(amount);
+                            }
+                        }
+                    }
+                    else if (choice == 7) {
+                        std::cin.ignore(); // Clear the newline from the buffer
+                        std::cout << "Enter card number: ";
+                        std::getline(std::cin, cardNumber);
+            
+                        BankCard* card = cardSystem.findCard(cardNumber);
+                        if (!card) {
+                            std::cout << "Card not found." << std::endl;
+                        }
+                        else {
+                            card->displayTransactionHistory();
+                        }
+                    }
+                    else if (choice == 8) {
+                        std::cin.ignore(); // Clear the newline from the buffer
+                        std::cout << "Enter card number: ";
+                        std::getline(std::cin, cardNumber);
+            
+                        BankCard* card = cardSystem.findCard(cardNumber);
+                        if (!card) {
+                            std::cout << "Card not found." << std::endl;
+                        }
+                        else {
+                            int action;
+                            std::cout << "Current status: " << (card->isActive() ? "Active" : "Inactive") << std::endl;
+                            std::cout << "Enter 1 to activate or 0 to deactivate: ";
+                            std::cin >> action;
+            
+                            if (action == 1) {
+                                card->activate();
+                                std::cout << "Card activated." << std::endl;
+                            }
+                            else {
+                                card->deactivate();
+                                std::cout << "Card deactivated." << std::endl;
+                            }
+                        }
+                    }
+                    else if (choice == 9) {
+                        std::cout << "Exiting the Bank Card System. Goodbye!" << std::endl;
+                    }
+                    else {
+                        std::cout << "Invalid choice. Please try again." << std::endl;
+                    }
+                } while (choice != 9);
+            
+                return 0;
+            
+            }

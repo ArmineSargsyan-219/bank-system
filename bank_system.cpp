@@ -6,6 +6,11 @@
 #include <algorithm>
 #include <random>
 #include <sstream>
+#include <cstdlib>
+#include <fstream>
+#include <filesystem>
+
+
 using namespace std;
 
 class Transaction{
@@ -53,7 +58,8 @@ class Transaction{
 };
 
 class BankCard{
-    protected:
+  
+    public:
     std::string cardNumber;
     std::string cardholderName;
     std::string expirationDate;
@@ -133,12 +139,12 @@ class BankCard{
 };
 
 class DebitCard : public BankCard {
-    private:
+    public:
         double accountBalance;
         std::string accountNumber;
         bool overdraftProtection;
     
-    public:
+
         DebitCard(const std::string& name, double initialBalance, bool overdraft = false)
             : BankCard(name, initialBalance), accountBalance(initialBalance), 
               overdraftProtection(overdraft) {
@@ -184,6 +190,7 @@ class DebitCard : public BankCard {
         std::string getCardType() const override {
             return "Debit Card";
         }
+        bool hasOverdraftProtection() const { return overdraftProtection; }
         
         void displayCardInfo() const {
             BankCard::displayCardInfo();
@@ -195,13 +202,13 @@ class DebitCard : public BankCard {
     };
 
     class CreditCard : public BankCard {
-        private:
+        public:
             double currentBalance;
             double interestRate;
             std::string billingCycle;
             double minimumPayment;
         
-        public:
+       
             CreditCard(const std::string& name, double limit, double rate)
                 : BankCard(name, limit), currentBalance(0), interestRate(rate) {
                 billingCycle = "Monthly";
@@ -256,7 +263,11 @@ class DebitCard : public BankCard {
             std::string getCardType() const override {
                 return "Credit Card";
             }
-            
+            double getInterestRate() const { return interestRate; }
+             
+            double getCardLimit() const { return cardLimit; }
+
+            void setCurrentBalance(double balance) { currentBalance = balance; }
             void displayCardInfo() const {
                 BankCard::displayCardInfo();
                 std::cout << "Credit Limit: $" << std::fixed << std::setprecision(2) << cardLimit << std::endl;
@@ -271,9 +282,10 @@ class DebitCard : public BankCard {
     
 
         class BankCardSystem {
-            private:
-                std::vector<BankCard*> cards;
             public:
+                std::vector<BankCard*> cards;
+                const string dataFile = "bank_cards.txt";
+
                 ~BankCardSystem() {
                     for (auto card : cards) {
                         delete card;
@@ -284,6 +296,7 @@ class DebitCard : public BankCard {
                 void addCard(BankCard* card) {
                     cards.push_back(card);
                     std::cout << "Card successfully added to the system." << std::endl;
+                    saveCardsToFile();
                 }
             
                 BankCard* findCard(const std::string& cardNumber) {
@@ -308,7 +321,169 @@ class DebitCard : public BankCard {
                         card->displayCardInfo();
                     }
                 }
-            };
+         
+             // NEW: Save all cards to text file
+    void saveCardsToFile() {
+        cout << "Attempting to save " << cards.size() << " cards to file " << dataFile << endl;
+        ofstream outFile(dataFile);
+        if (!outFile) {
+            cerr << "Error opening file for writing." << endl;
+            return;
+        }
+
+        for (auto card : cards) {
+            if (dynamic_cast<DebitCard*>(card)) {
+                DebitCard* dc = dynamic_cast<DebitCard*>(card);
+                outFile << "DEBIT|" 
+                << dc->getCardNumber() << "|"
+                << dc->getCardholderName() << "|"
+                << dc->isActive() << "|"
+                << dc->getBalance() << "|"
+                << (dc->hasOverdraftProtection() ? "1" : "0") << "\n";
+            }
+            else if (dynamic_cast<CreditCard*>(card)) {
+                CreditCard* cc = dynamic_cast<CreditCard*>(card);
+                outFile << "CREDIT|" 
+                       << cc->getCardNumber() << "|"
+                       << cc->getCardholderName() << "|"
+                       << cc->isActive() << "|"
+                       << cc->getBalance() << "|"
+                       << cc->getInterestRate() << "|"
+                       << cc->getCardLimit() << "\n";
+            }
+        }
+        outFile.close();
+        cout << "Successfully saved cards to file." << endl;
+    }
+
+    // NEW: Load cards from text file at startup
+    void loadCardsFromFile() {
+        ifstream inFile(dataFile);
+        if (!inFile) {
+            cout << "No existing data file found. Starting fresh." << endl;
+            return;
+        }
+
+        // Clear existing cards
+        for (auto card : cards) {
+            delete card;
+        }
+        cards.clear();
+
+        string line;
+        while (getline(inFile, line)) {
+            vector<string> tokens;
+            string token;
+            istringstream tokenStream(line);
+            
+            while (getline(tokenStream, token, '|')) {
+                tokens.push_back(token);
+            }
+
+            if (tokens.empty()) continue;
+
+            if (tokens[0] == "DEBIT" && tokens.size() >= 6) {
+                try {
+                    string cardNum = tokens[1];
+                    string name = tokens[2];
+                    bool active = tokens[3] == "1";
+                    double balance = stod(tokens[4]);
+                    bool overdraft = tokens[5] == "1";
+
+                    DebitCard* dc = new DebitCard(name, balance, overdraft);
+                    dc->cardNumber = cardNum; // Override generated number
+                    if (!active) dc->deactivate();
+                    cards.push_back(dc);
+                } catch (...) {
+                    cerr << "Error parsing debit card data: " << line << endl;
+                }
+            }
+            else if (tokens[0] == "CREDIT" && tokens.size() >= 7) {
+                try {
+                    string cardNum = tokens[1];
+                    string name = tokens[2];
+                    bool active = tokens[3] == "1";
+                    double balance = stod(tokens[4]);
+                    double interestRate = stod(tokens[5]);
+                    double limit = stod(tokens[6]);
+
+                    CreditCard* cc = new CreditCard(name, limit, interestRate);
+                    cc->currentBalance = balance;
+                    cc->cardNumber = cardNum;
+                    if (!active) cc->deactivate();
+                    cards.push_back(cc);
+                } catch (...) {
+                    cerr << "Error parsing credit card data: " << line << endl;
+                }
+            }
+        }
+        inFile.close();
+    }
+};
+
+// MODIFIED: Added save calls after operations that modify data
+void processMenuChoice(int choice, BankCardSystem& cardSystem) {
+    string name, cardNumber;
+    double amount, limit, rate, initialBalance;
+    bool overdraft;
+
+    if (choice == 1) {
+        cin.ignore();
+        cout << "Enter cardholder name: ";
+        getline(cin, name);
+
+        cout << "Enter initial balance: $";
+        cin >> initialBalance;
+
+        cout << "Enable overdraft protection? (1 for Yes, 0 for No): ";
+        cin >> overdraft;
+
+        DebitCard* debitCard = new DebitCard(name, initialBalance, overdraft);
+        cardSystem.addCard(debitCard);
+        debitCard->displayCardInfo();
+    }
+    else if (choice == 2) {
+        cin.ignore();
+        cout << "Enter cardholder name: ";
+        getline(cin, name);
+
+        cout << "Enter credit limit: $";
+        cin >> limit;
+
+        cout << "Enter annual interest rate (as decimal, e.g., 0.1895 for 18.95%): ";
+        cin >> rate;
+
+        CreditCard* creditCard = new CreditCard(name, limit, rate);
+        cardSystem.addCard(creditCard);
+        creditCard->displayCardInfo();
+    }
+    // ... (other menu options remain similar) ...
+    else if (choice == 8) {
+        cin.ignore();
+        cout << "Enter card number: ";
+        getline(cin, cardNumber);
+
+        BankCard* card = cardSystem.findCard(cardNumber);
+        if (!card) {
+            cout << "Card not found." << endl;
+        }
+        else {
+            int action;
+            cout << "Current status: " << (card->isActive() ? "Active" : "Inactive") << endl;
+            cout << "Enter 1 to activate or 0 to deactivate: ";
+            cin >> action;
+
+            if (action == 1) {
+                card->activate();
+            }
+            else {
+                card->deactivate();
+            }
+            cardSystem.saveCardsToFile();  // Save after status change
+            cout << "Card status updated." << endl;
+        }
+    }
+}
             
             // Simple menu-based interface to demonstrate the system
             void displayMenu() {
@@ -327,9 +502,11 @@ class DebitCard : public BankCard {
             
             int main() {
                 // Seed random number generator
-                std::srand(static_cast<unsigned int>(std::time(nullptr)));
-            
+                srand(static_cast<unsigned int>(time(nullptr)));
                 BankCardSystem cardSystem;
+                
+                cardSystem.loadCardsFromFile();
+          
                 int choice;
                 std::string name, cardNumber;
                 double amount, limit, rate, initialBalance;
